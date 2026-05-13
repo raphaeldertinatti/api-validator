@@ -7,12 +7,17 @@ import (
 	"api-validator/internal/storage"
 	"fmt"
 	"log"
+	"log/slog"
+	"os"
 )
 
 func main() {
 	// 0. Carregar Configurações (Lê do .env ou variáveis de sistema)
-	cfg := config.Load()
-
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("falha ao carregar configuração", "erro", err)
+		os.Exit(1)
+	}
 	// 1. Inicializar Armazenamento (MongoDB)
 	mongoDB, err := storage.NewMongoDB(cfg.MongoURI, cfg.DBName)
 	if err != nil {
@@ -30,7 +35,7 @@ func main() {
 	router := h.InitRoutes()
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("Servidor rodando em http://localhost%s\n", addr)
-	
+
 	if err := router.Run(addr); err != nil {
 		log.Fatalf("Falha ao iniciar o servidor: %v", err)
 	}
