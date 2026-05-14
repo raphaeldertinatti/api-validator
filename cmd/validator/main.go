@@ -2,9 +2,11 @@ package main
 
 import (
 	"api-validator/internal/config"
+	"api-validator/internal/repository"
 	"api-validator/internal/server/handler"
 	"api-validator/internal/service"
 	"api-validator/internal/storage"
+	"context"
 	"fmt"
 	"log"
 	"log/slog"
@@ -23,12 +25,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Falha ao conectar ao MongoDB: %v", err)
 	}
-	defer mongoDB.Disconnect()
+	defer mongoDB.Disconnect(context.Background())
 
-	// 2. Inicializar Serviços (Lógica de Negócio)
-	validatorService := service.NewValidatorService(mongoDB, cfg.GeminiAPIKey)
+	// 2. Inicializar Repositórios
+	ncmRepo := repository.NewNCMRepository(mongoDB)
 
-	// 3. Inicializar Handler (Rotas e Injeção de Dependência)
+	// 3. Inicializar Serviços (Lógica de Negócio)
+	validatorService := service.NewValidatorService(ncmRepo, cfg.GeminiAPIKey)
+
+	// 4. Inicializar Handler (Rotas e Injeção de Dependência)
 	h := handler.NewHandler(validatorService)
 
 	// 4. Iniciar Servidor HTTP
