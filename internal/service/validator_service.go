@@ -6,25 +6,25 @@ import (
 	"fmt"
 )
 
-type MongoService interface {
-	FindNCM(ctx context.Context, ncmCode string) (string, error)
+type NCMRepository interface {
+	FindDescricaoCompleta(ctx context.Context, ncmCode string) (string, error)
 }
 
 type ValidatorService struct {
-	mongoService MongoService
+	ncmRepo      NCMRepository
 	geminiClient *GeminiClient
 }
 
-func NewValidatorService(mongoService MongoService, apiKey string) *ValidatorService {
+func NewValidatorService(ncmRepo NCMRepository, apiKey string) *ValidatorService {
 	return &ValidatorService{
-		mongoService: mongoService,
+		ncmRepo:      ncmRepo,
 		geminiClient: NewGeminiClient(apiKey),
 	}
 }
 
 func (s *ValidatorService) ValidateProduct(ctx context.Context, req domains.ValidateRequest) (*domains.ValidateResponse, error) {
-	// 1. Buscar descrição do NCM no MongoDB
-	ncmDescricao, err := s.mongoService.FindNCM(ctx, req.NCM)
+	// 1. Buscar descrição do NCM no MongoDB via repositório
+	ncmDescricao, err := s.ncmRepo.FindDescricaoCompleta(ctx, req.NCM)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao buscar NCM: %w", err)
 	}

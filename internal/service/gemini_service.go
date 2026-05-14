@@ -76,7 +76,7 @@ Responda APENAS o JSON, sem markdown, sem código, sem explicações adicionais.
 		},
 		GenerationConfig: geminiGenerationConfig{
 			Temperature:     0.1, // mais determinístico para validação
-			MaxOutputTokens: 512,
+			MaxOutputTokens: 1024,
 		},
 	}
 
