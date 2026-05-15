@@ -1,6 +1,7 @@
 package service
 
 import (
+	"api-validator/internal/domains"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -8,57 +9,50 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
-// GeminiClient encapsula a chamada à API do Gemini
-type GeminiClient struct {
-	apiKey     string
-	httpClient *http.Client
-	model      string
+type NCMRepository interface {
+	FindDescricaoCompleta(ctx context.Context, ncmCode string) (string, error)
 }
 
-func NewGeminiClient(apiKey string) *GeminiClient {
-	return &GeminiClient{
-		apiKey: apiKey,
-		model:  "gemini-3-flash-preview", // melhor custo-benefício no plano gratuito
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+type NCMService struct {
+	repo   NCMRepository
+	gemini *GeminiService
+}
+
+func NewNCMService(repo NCMRepository, gemini *GeminiService) *NCMService {
+	return &NCMService{
+		repo:   repo,
+		gemini: gemini,
 	}
 }
 
-// structs para a API REST do Gemini
-type geminiRequest struct {
-	Contents         []geminiContent        `json:"contents"`
-	GenerationConfig geminiGenerationConfig `json:"generationConfig"`
+func (s *NCMService) ValidateNCM(ctx context.Context, req domains.ValidateRequest) (*domains.ValidateResponse, error) {
+	// 1. Buscar descrição do NCM no MongoDB via repositório
+	ncmDescricao, err := s.repo.FindDescricaoCompleta(ctx, req.NCM)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao buscar NCM: %w", err)
+	}
+
+	if ncmDescricao == "" {
+		ncmDescricao = "NCM não encontrado na base de dados."
+	}
+
+	// 2. Validar com Gemini usando o novo cliente REST
+	validacaoLLM, status, err := s.CompatibilidadeNCM(ctx, req.Descricao, ncmDescricao)
+	if err != nil {
+		return nil, fmt.Errorf("erro na validação com Gemini: %w", err)
+	}
+
+	return &domains.ValidateResponse{
+		NCMDescricao:    ncmDescricao,
+		ValidacaoLLM:    validacaoLLM,
+		StatusValidacao: status,
+	}, nil
 }
 
-type geminiContent struct {
-	Parts []geminiPart `json:"parts"`
-}
-
-type geminiPart struct {
-	Text string `json:"text"`
-}
-
-type geminiGenerationConfig struct {
-	Temperature     float64 `json:"temperature"`
-	MaxOutputTokens int     `json:"maxOutputTokens"`
-}
-
-type geminiResponse struct {
-	Candidates []struct {
-		Content geminiContent `json:"content"`
-	} `json:"candidates"`
-	Error *struct {
-		Message string `json:"message"`
-		Code    int    `json:"code"`
-	} `json:"error,omitempty"`
-}
-
-// ValidateNCM verifica se a descrição do produto condiz com a NCM
-func (g *GeminiClient) ValidateNCM(ctx context.Context, prodDesc, ncmDesc string) (string, bool, error) {
+// ValidateNCM verifica se a descrição do produto é compatível com a NCM
+func (s *NCMService) CompatibilidadeNCM(ctx context.Context, prodDesc, ncmDesc string) (string, bool, error) {
 	prompt := fmt.Sprintf(`Você é um especialista em classificação fiscal (NCM).
 Analise se a descrição do produto fornecida condiz com a descrição oficial da NCM.
 
@@ -87,7 +81,7 @@ Responda APENAS o JSON, sem markdown, sem código, sem explicações adicionais.
 
 	url := fmt.Sprintf(
 		"https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
-		g.model, g.apiKey,
+		s.gemini.model, s.gemini.apiKey,
 	)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
@@ -96,7 +90,7 @@ Responda APENAS o JSON, sem markdown, sem código, sem explicações adicionais.
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := s.gemini.httpClient.Do(req)
 	if err != nil {
 		return "", false, fmt.Errorf("erro na chamada HTTP: %w", err)
 	}
