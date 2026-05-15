@@ -40,7 +40,7 @@ func (h *Handler) Validate(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.validatorService.ValidateProduct(c.Request.Context(), req)
+	resp, err := h.validatorService.Validate(c.Request.Context(), req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

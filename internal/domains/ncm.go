@@ -30,3 +30,15 @@ type NCMDocument struct {
 	} `bson:"ato"`
 	Versao string `bson:"versao"`
 }
+
+type NCMHierarchyItem struct {
+	Codigo    string `bson:"codigo"`
+	Descricao string `bson:"descricao"`
+}
+
+type NCMResult struct {
+	Codigo        string `json:"codigo"`
+	Descricao     string `json:"descricao"`
+	Valido        bool   `json:"valido"`
+	Justificativa string `json:"justificativa"`
+}
