@@ -36,9 +36,15 @@ type NCMHierarchyItem struct {
 	Descricao string `bson:"descricao"`
 }
 
-type NCMResult struct {
-	Codigo        string `json:"codigo"`
-	Descricao     string `json:"descricao"`
-	Valido        bool   `json:"valido"`
+type NCMValidacaoResponse struct {
+	NCM          string                   `json:"ncm"`
+	Descricao    string                   `json:"descricao"`
+	NCMDescricao string                   `json:"ncm_descricao"`
+	RetornoLLM   NCMCompatibilidadeResult `json:"retorno_llm"`
+}
+
+type NCMCompatibilidadeResult struct {
+	Compativel    bool   `json:"compativel"`
+	Status        string `json:"status"` // "SIM" ou "NAO"
 	Justificativa string `json:"justificativa"`
 }
