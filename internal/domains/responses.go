@@ -1,5 +1,6 @@
 package domains
 
 type ValidateResponse struct {
-	NCM NCMValidacaoResponse `json:"ncm"`
+	NCM *NCMValidacaoResponse `json:"ncm,omitempty"`
+	IPI *IPIValidacaoResponse `json:"ipi,omitempty"`
 }
