@@ -29,9 +29,13 @@ func main() {
 
 	// 2. Inicializar Repositórios
 	ncmRepo := repository.NewNCMRepository(mongoDB)
+	ipiRepo := repository.NewIPRepository(mongoDB)
+	// cestRepo := repository.NewCESTRepository(mongoDB)
+	// pisCofinsRepo := repository.NewPISCOFINSRepository(mongoDB)
+	// icmsRepo := repository.NewICMSRepository(mongoDB)
 
 	// 3. Inicializar Serviços (Lógica de Negócio)
-	validatorService := service.NewValidatorService(ncmRepo, cfg.GeminiAPIKey)
+	validatorService := service.NewValidatorService(ncmRepo, ipiRepo, cfg.GeminiAPIKey)
 
 	// 4. Inicializar Handler (Rotas e Injeção de Dependência)
 	h := handler.NewHandler(validatorService)
