@@ -7,12 +7,19 @@ import (
 )
 
 type ValidatorService struct {
-	ncm  *NCMService
-	ipi  *IPIService
-	cest *CESTService
+	ncm       *NCMService
+	ipi       *IPIService
+	cest      *CESTService
+	piscofins *PISCOFINSService
 }
 
-func NewValidatorService(ncmRepo NCMRepository, ipiRepo IPIRepository, cestRepo CESTRepository, apiKey string) *ValidatorService {
+func NewValidatorService(
+	ncmRepo NCMRepository,
+	ipiRepo IPIRepository,
+	cestRepo CESTRepository,
+	piscofinsRepo PISCOFINSRepository,
+	apiKey string,
+) *ValidatorService {
 	// Inicializa o serviço base de IA
 	gemini := NewGeminiService(apiKey)
 
@@ -20,11 +27,13 @@ func NewValidatorService(ncmRepo NCMRepository, ipiRepo IPIRepository, cestRepo 
 	ncm := NewNCMService(ncmRepo, gemini)
 	ipi := NewIPIService(ipiRepo, gemini)
 	cest := NewCESTService(cestRepo, gemini)
+	piscofins := NewPISCOFINSService(piscofinsRepo)
 
 	return &ValidatorService{
-		ncm:  ncm,
-		ipi:  ipi,
-		cest: cest,
+		ncm:       ncm,
+		ipi:       ipi,
+		cest:      cest,
+		piscofins: piscofins,
 	}
 }
 
@@ -53,9 +62,16 @@ func (v *ValidatorService) Validate(ctx context.Context, req domains.ValidateReq
 		return nil, err
 	}
 
+	// 4. PIS/COFINS — depende do NCM
+	piscofinsResult, err := v.piscofins.ValidatePISCOFINS(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
 	return &domains.ValidateResponse{
-		NCM:  ncmResult,
-		IPI:  ipiResult,
-		CEST: cestResult,
+		NCM:       ncmResult,
+		IPI:       ipiResult,
+		CEST:      cestResult,
+		PISCOFINS: piscofinsResult,
 	}, nil
 }

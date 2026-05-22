@@ -61,7 +61,7 @@ Descrição do Produto: %s
 Descrição Oficial da NCM: %s
 
 Responda APENAS este JSON válido, sem markdown, sem explicações adicionais:
-{"status": "SIM", "justificativa": "motivo em até 15 palavras"}
+{"status": "SIM", "justificativa": "motivo em até 20 palavras"}
 
 O campo status deve ser exatamente "SIM" ou "NAO".`, prodDesc, ncmDesc)
 
