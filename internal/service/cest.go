@@ -73,7 +73,7 @@ Responda APENAS JSON:
   "status": "DEFINIDO"|"AMBIGUO"|"NAO_ENQUADRADO",
   "enquadrado": {"cest":"", "descricao":"", "segmento":""},
   "possibilidades": [],
-  "justificativa": ""
+  "justificativa": "Sua justificativa aqui em no máximo 20 palavras"
 }
 
 DEFINIDO: Descrição do produto bate com 1 CEST.
@@ -136,9 +136,13 @@ NAO_ENQUADRADO: Descrição do produto não bate com as descrições específica
 	rawText = strings.TrimSuffix(rawText, "```")
 	rawText = strings.TrimSpace(rawText)
 
+	if rawText == "" {
+		return nil, fmt.Errorf("Gemini retornou um texto vazio para a análise de CEST")
+	}
+
 	var llmResult domains.CESTValidacaoResponse
 	if err := json.Unmarshal([]byte(rawText), &llmResult); err != nil {
-		return nil, fmt.Errorf("erro ao processar decisão da IA: %w", err)
+		return nil, fmt.Errorf("erro ao processar decisão da IA: %w (raw: %s)", err, rawText)
 	}
 
 	return &llmResult, nil

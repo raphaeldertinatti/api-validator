@@ -56,7 +56,7 @@ Prod: %s
 EXs: %s
 
 Responda APENAS JSON:
-{"status":"DEFINIDO"|"AMBIGUO"|"PADRAO","ex_enquadrado":{"ex":"","aliquota":0,"descricao":"","justificativa":""},"possibilidades":[],"justificativa":""}
+{"status":"DEFINIDO"|"AMBIGUO"|"PADRAO","ex_enquadrado":{"ex":"","aliquota":0,"descricao":"","justificativa":""},"possibilidades":[],"justificativa":"Sua justificativa aqui em no máximo 20 palavras"}
 
 DEFINIDO: 1 match claro. AMBIGUO: dúvida (liste em possibilidades). PADRAO: 0 match.`, req.NCM, req.Descricao, string(exsJSON))
 
@@ -116,6 +116,10 @@ DEFINIDO: 1 match claro. AMBIGUO: dúvida (liste em possibilidades). PADRAO: 0 m
 	rawText = strings.TrimSuffix(rawText, "```")
 	rawText = strings.TrimSpace(rawText)
 
+	if rawText == "" {
+		return nil, fmt.Errorf("Gemini retornou um texto vazio para enquadramento de IPI")
+	}
+
 	var llmResult struct {
 		Status         string                      `json:"status"`
 		ExEnquadrado   *domains.ExTarifarioResult  `json:"ex_enquadrado"`
@@ -124,7 +128,7 @@ DEFINIDO: 1 match claro. AMBIGUO: dúvida (liste em possibilidades). PADRAO: 0 m
 	}
 
 	if err := json.Unmarshal([]byte(rawText), &llmResult); err != nil {
-		return nil, fmt.Errorf("erro ao processar decisão da IA: %w", err)
+		return nil, fmt.Errorf("erro ao processar decisão da IA: %w (raw: %s)", err, rawText)
 	}
 
 	finalResp := &domains.IPIValidacaoResponse{
