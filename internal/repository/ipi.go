@@ -32,14 +32,3 @@ func (r *IPIRepository) FindByCode(ctx context.Context, ipiCode string) (*domain
 	}
 	return &result, nil
 }
-
-func (r *IPIRepository) FindAliqIPI(ctx context.Context, ncmCode string) (*float64, string, bool, error) {
-	doc, err := r.FindByCode(ctx, ncmCode)
-	if err != nil {
-		return nil, "", false, err
-	}
-	if doc == nil {
-		return nil, "", false, nil
-	}
-	return doc.Aliquota, doc.Situacao, doc.TemEx, nil
-}

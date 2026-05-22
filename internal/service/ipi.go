@@ -12,7 +12,6 @@ import (
 )
 
 type IPIRepository interface {
-	FindAliqIPI(ctx context.Context, ncmCode string) (*float64, string, bool, error)
 	FindByCode(ctx context.Context, ncmCode string) (*domains.IPIDocument, error)
 }
 
