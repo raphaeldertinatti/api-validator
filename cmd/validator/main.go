@@ -32,9 +32,10 @@ func main() {
 	ipiRepo := repository.NewIPRepository(mongoDB)
 	cestRepo := repository.NewCESTRepository(mongoDB)
 	piscofinsRepo := repository.NewPISCOFINSRepository(mongoDB)
+	isencaoRepo := repository.NewIsencaoRepository(mongoDB)
 
 	// 3. Inicializar Serviços (Lógica de Negócio)
-	validatorService := service.NewValidatorService(ncmRepo, ipiRepo, cestRepo, piscofinsRepo, cfg.GeminiAPIKey)
+	validatorService := service.NewValidatorService(ncmRepo, ipiRepo, cestRepo, piscofinsRepo, isencaoRepo, cfg.GeminiAPIKey)
 
 	// 4. Inicializar Handler (Rotas e Injeção de Dependência)
 	h := handler.NewHandler(validatorService)

@@ -11,6 +11,7 @@ type ValidatorService struct {
 	ipi       *IPIService
 	cest      *CESTService
 	piscofins *PISCOFINSService
+	isencao   *IsencaoService
 }
 
 func NewValidatorService(
@@ -18,6 +19,7 @@ func NewValidatorService(
 	ipiRepo IPIRepository,
 	cestRepo CESTRepository,
 	piscofinsRepo PISCOFINSRepository,
+	isencaoRepo IsencaoRepository,
 	apiKey string,
 ) *ValidatorService {
 	// Inicializa o serviço base de IA
@@ -28,12 +30,14 @@ func NewValidatorService(
 	ipi := NewIPIService(ipiRepo, gemini)
 	cest := NewCESTService(cestRepo, gemini)
 	piscofins := NewPISCOFINSService(piscofinsRepo)
+	isencao := NewIsencaoService(isencaoRepo, gemini)
 
 	return &ValidatorService{
 		ncm:       ncm,
 		ipi:       ipi,
 		cest:      cest,
 		piscofins: piscofins,
+		isencao:   isencao,
 	}
 }
 
@@ -68,10 +72,28 @@ func (v *ValidatorService) Validate(ctx context.Context, req domains.ValidateReq
 		return nil, err
 	}
 
+	// 5. Isenção — depende do NCM
+	isencaoResult, err := v.isencao.ValidateIsencao(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// 6. Se for Isento retorna a response e não valida mais nada, isenção prevalece sobre os outros impostos.
+	if isencaoResult.Isento {
+		return &domains.ValidateResponse{
+			NCM:       ncmResult,
+			IPI:       ipiResult,
+			CEST:      cestResult,
+			PISCOFINS: piscofinsResult,
+			Isencao:   isencaoResult,
+		}, nil
+	}
+
 	return &domains.ValidateResponse{
 		NCM:       ncmResult,
 		IPI:       ipiResult,
 		CEST:      cestResult,
 		PISCOFINS: piscofinsResult,
+		Isencao:   isencaoResult,
 	}, nil
 }

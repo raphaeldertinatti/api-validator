@@ -5,4 +5,5 @@ type ValidateResponse struct {
 	IPI       *IPIValidacaoResponse       `json:"ipi,omitempty"`
 	CEST      *CESTValidacaoResponse      `json:"cest,omitempty"`
 	PISCOFINS *PISCOFINSValidacaoResponse `json:"piscofins,omitempty"`
+	Isencao   *IsencaoValidacaoResponse   `json:"isencao,omitempty"`
 }
