@@ -30,7 +30,7 @@ func NewValidatorService(
 	ipi := NewIPIService(ipiRepo, gemini)
 	cest := NewCESTService(cestRepo, gemini)
 	piscofins := NewPISCOFINSService(piscofinsRepo)
-	isencao := NewIsencaoService(isencaoRepo, gemini)
+	isencao := NewIsencaoService(ncmRepo, isencaoRepo, gemini)
 
 	return &ValidatorService{
 		ncm:       ncm,

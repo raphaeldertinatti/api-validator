@@ -52,6 +52,5 @@ type IsencaoValidacaoResponse struct {
 	Isento        bool   `json:"isento"`
 	Artigo        string `json:"artigo,omitempty"`
 	Paragrafo     string `json:"paragrafo,omitempty"`
-	Inciso        string `json:"inciso,omitempty"`
 	Justificativa string `json:"justificativa,omitempty"`
 }

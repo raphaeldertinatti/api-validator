@@ -16,14 +16,16 @@ type IsencaoRepository interface {
 }
 
 type IsencaoService struct {
-	repo   IsencaoRepository
-	gemini *GeminiService
+	ncmRepo NCMRepository
+	repo    IsencaoRepository
+	gemini  *GeminiService
 }
 
-func NewIsencaoService(repo IsencaoRepository, gemini *GeminiService) *IsencaoService {
+func NewIsencaoService(ncmRepo NCMRepository, repo IsencaoRepository, gemini *GeminiService) *IsencaoService {
 	return &IsencaoService{
-		repo:   repo,
-		gemini: gemini,
+		ncmRepo: ncmRepo,
+		repo:    repo,
+		gemini:  gemini,
 	}
 }
 
@@ -34,6 +36,11 @@ func (s *IsencaoService) ValidateIsencao(ctx context.Context, req domains.Valida
 		return nil, fmt.Errorf("erro ao buscar isenções: %w", err)
 	}
 
+	ncmDescricao, err := s.ncmRepo.FindDescricaoCompleta(ctx, req.NCM)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao buscar NCM: %w", err)
+	}
+
 	if len(docs) == 0 {
 		return &domains.IsencaoValidacaoResponse{
 			Isento:        false,
@@ -42,10 +49,10 @@ func (s *IsencaoService) ValidateIsencao(ctx context.Context, req domains.Valida
 	}
 
 	// 2. Analisar se a descrição do produto bate com a descrição de alguma isenção
-	return s.AnaliseIsencao(ctx, req, docs)
+	return s.AnaliseIsencao(ctx, req, docs, ncmDescricao)
 }
 
-func (s *IsencaoService) AnaliseIsencao(ctx context.Context, req domains.ValidateRequest, docs []domains.IsencaoDocument) (*domains.IsencaoValidacaoResponse, error) {
+func (s *IsencaoService) AnaliseIsencao(ctx context.Context, req domains.ValidateRequest, docs []domains.IsencaoDocument, ncmDescricao string) (*domains.IsencaoValidacaoResponse, error) {
 	type IsencaoBrief struct {
 		ID             interface{}              `json:"id"`
 		Artigo         string                   `json:"artigo"`
@@ -76,6 +83,8 @@ func (s *IsencaoService) AnaliseIsencao(ctx context.Context, req domains.Validat
 Cada documento candidato é independente e suas condições não se relacionam, escolha a mais específica ou adequada de acordo com a descrição do produto e as previsões legais.
 
 Produto: %s
+NCM: %s
+Descrição NCM: %s
 Isenções Candidatas: %s
 
 Responda APENAS JSON:
@@ -83,11 +92,10 @@ Responda APENAS JSON:
   "isento": true|false,
   "artigo": "...",
   "paragrafo": "...",
-  "inciso": "...",
   "justificativa": "Sua justificativa aqui em no máximo 20 palavras"
 }
 
-O campo "isento" deve ser um booleano (true ou false) e não uma string.`, req.Descricao, string(isencoesJSON))
+O campo "isento" deve ser um booleano (true ou false) e não uma string.`, req.Descricao, req.NCM, ncmDescricao, string(isencoesJSON))
 
 	reqBody := geminiRequest{
 		Contents: []geminiContent{
