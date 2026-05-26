@@ -47,15 +47,17 @@ func (s *CESTService) ValidateCEST(ctx context.Context, req domains.ValidateRequ
 
 func (s *CESTService) AnaliseCEST(ctx context.Context, req domains.ValidateRequest, docs []domains.CESTDocument) (*domains.CESTValidacaoResponse, error) {
 	type CestBrief struct {
-		CEST      string `json:"cest"`
-		Descricao string `json:"descricao"`
-		Segmento  string `json:"segmento"`
+		CEST      string   `json:"cest"`
+		NCMS      []string `json:"ncm_codigos"`
+		Descricao string   `json:"descricao"`
+		Segmento  string   `json:"segmento"`
 	}
 	var possibleCests []CestBrief
 	for _, d := range docs {
 		possibleCests = append(possibleCests, CestBrief{
 			CEST:      d.CEST,
 			Descricao: d.Descricao,
+			NCMS:      d.NCMsCodigos,
 			Segmento:  d.Segmento.Descricao,
 		})
 	}
@@ -63,9 +65,9 @@ func (s *CESTService) AnaliseCEST(ctx context.Context, req domains.ValidateReque
 
 	// Prompt focado na comparação de descrições
 	prompt := fmt.Sprintf(`Como especialista tributário, valide se o produto abaixo se enquadra em algum dos códigos CEST da lista. 
-Nota: O enquadramento no CEST depende da descrição do produto ser compatível com a descrição específica do CEST, não apenas da NCM.
 
 Produto: %s
+NCM: %s
 CESTs Candidatos: %s
 
 Responda APENAS JSON:
@@ -73,20 +75,22 @@ Responda APENAS JSON:
   "status": "DEFINIDO"|"AMBIGUO"|"NAO_ENQUADRADO",
   "enquadrado": {"cest":"", "descricao":"", "segmento":""},
   "possibilidades": [],
-  "justificativa": "Sua justificativa aqui em no máximo 20 palavras"
+  "justificativa": "Sua justificativa aqui em no máximo 15 palavras"
 }
 
+Se status não for DEFINIDO, deixe "enquadrado" como nulo ou vazio.
 DEFINIDO: Descrição do produto bate com 1 CEST.
 AMBIGUO: Descrição bate com >1 CEST.
-NAO_ENQUADRADO: Descrição do produto não bate com as descrições específicas dos CESTs listados.`, req.Descricao, string(cestsJSON))
+NAO_ENQUADRADO: Nenhuma descrição bate.`, req.Descricao, req.NCM, string(cestsJSON))
 
 	reqBody := geminiRequest{
 		Contents: []geminiContent{
 			{Parts: []geminiPart{{Text: prompt}}},
 		},
 		GenerationConfig: geminiGenerationConfig{
-			Temperature:     0.1,
-			MaxOutputTokens: 1024,
+			Temperature:      0.1,
+			MaxOutputTokens:  2048,
+			ResponseMimeType: "application/json",
 		},
 	}
 

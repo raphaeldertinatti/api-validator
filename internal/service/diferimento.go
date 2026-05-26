@@ -11,29 +11,29 @@ import (
 	"strings"
 )
 
-type IsencaoRepository interface {
-	FindByCode(ctx context.Context, ncmCode string) ([]domains.IsencaoDocument, error)
+type DiferimentoRepository interface {
+	FindByCode(ctx context.Context, ncmCode string) ([]domains.DiferimentoDocument, error)
 }
 
-type IsencaoService struct {
+type DiferimentoService struct {
 	ncmRepo NCMRepository
-	repo    IsencaoRepository
+	repo    DiferimentoRepository
 	gemini  *GeminiService
 }
 
-func NewIsencaoService(ncmRepo NCMRepository, repo IsencaoRepository, gemini *GeminiService) *IsencaoService {
-	return &IsencaoService{
+func NewDiferimentoService(ncmRepo NCMRepository, repo DiferimentoRepository, gemini *GeminiService) *DiferimentoService {
+	return &DiferimentoService{
 		ncmRepo: ncmRepo,
 		repo:    repo,
 		gemini:  gemini,
 	}
 }
 
-func (s *IsencaoService) ValidateIsencao(ctx context.Context, req domains.ValidateRequest) (*domains.IsencaoValidacaoResponse, error) {
-	// 1. Buscar possíveis isenções para a NCM no MongoDB
+func (s *DiferimentoService) ValidateDiferimento(ctx context.Context, req domains.ValidateRequest) (*domains.DiferimentoValidacaoResponse, error) {
+	// 1. Buscar possíveis diferimentos para a NCM no MongoDB
 	docs, err := s.repo.FindByCode(ctx, req.NCM)
 	if err != nil {
-		return nil, fmt.Errorf("erro ao buscar isenções: %w", err)
+		return nil, fmt.Errorf("erro ao buscar diferimentos: %w", err)
 	}
 
 	ncmDescricao, err := s.ncmRepo.FindDescricaoCompleta(ctx, req.NCM)
@@ -42,33 +42,31 @@ func (s *IsencaoService) ValidateIsencao(ctx context.Context, req domains.Valida
 	}
 
 	if len(docs) == 0 {
-		return &domains.IsencaoValidacaoResponse{
-			Isento:        false,
-			Justificativa: "Produto não possui isenções previstas na legislação.",
+		return &domains.DiferimentoValidacaoResponse{
+			Diferido:      false,
+			Justificativa: "Produto não possui diferimento previsto na legislação.",
 		}, nil
 	}
 
-	// 2. Analisar se a descrição do produto bate com a descrição de alguma isenção
-	return s.AnaliseIsencao(ctx, req, docs, ncmDescricao)
+	// 2. Analisar se a descrição do produto bate com a descrição de algum diferimento
+	return s.AnaliseDiferimento(ctx, req, docs, ncmDescricao)
 }
 
-func (s *IsencaoService) AnaliseIsencao(ctx context.Context, req domains.ValidateRequest, docs []domains.IsencaoDocument, ncmDescricao string) (*domains.IsencaoValidacaoResponse, error) {
-	type IsencaoBrief struct {
-		ID             interface{}              `json:"id"`
-		Artigo         string                   `json:"artigo"`
-		Paragrafo      string                   `json:"paragrafo"`
-		Inciso         string                   `json:"inciso"`
-		Titulo         string                   `json:"titulo"`
-		DescricaoLegal string                   `json:"descricao_legal"`
-		Produtos       []string                 `json:"produtos"`
-		Condicoes      domains.IsencaoCondicoes `json:"condicoes"`
+func (s *DiferimentoService) AnaliseDiferimento(ctx context.Context, req domains.ValidateRequest, docs []domains.DiferimentoDocument, ncmDescricao string) (*domains.DiferimentoValidacaoResponse, error) {
+	type DiferimentoBrief struct {
+		ID             interface{}                  `json:"id"`
+		Artigo         string                       `json:"artigo"`
+		Inciso         *string                      `json:"inciso"`
+		Titulo         string                       `json:"titulo"`
+		DescricaoLegal string                       `json:"descricao_legal"`
+		Produtos       []string                     `json:"produtos"`
+		Condicoes      domains.DiferimentoCondicoes `json:"condicoes"`
 	}
-	var possibleIsencoes []IsencaoBrief
+	var possibleDiferimentos []DiferimentoBrief
 	for _, d := range docs {
-		possibleIsencoes = append(possibleIsencoes, IsencaoBrief{
+		possibleDiferimentos = append(possibleDiferimentos, DiferimentoBrief{
 			ID:             d.ID,
 			Artigo:         d.Artigo,
-			Paragrafo:      d.Paragrafo,
 			Inciso:         d.Inciso,
 			Titulo:         d.Titulo,
 			DescricaoLegal: d.DescricaoLegal,
@@ -76,26 +74,25 @@ func (s *IsencaoService) AnaliseIsencao(ctx context.Context, req domains.Validat
 			Condicoes:      d.Condicoes,
 		})
 	}
-	isencoesJSON, _ := json.Marshal(possibleIsencoes)
+	diferimentosJSON, _ := json.Marshal(possibleDiferimentos)
 
-	// Prompt focado na comparação de descrições e escolha entre candidatos
-	prompt := fmt.Sprintf(`Como especialista tributário, analise se o produto abaixo se enquadra em alguma das previsões de isenção fornecidas.
-Cada documento candidato é independente e suas condições não se relacionam, escolha a mais específica ou adequada de acordo com a descrição do produto e as previsões legais.
+	prompt := fmt.Sprintf(`Como especialista tributário, analise se o produto abaixo se enquadra em alguma das previsões de DIFERIMENTO DE ICMS fornecidas.
+Considere a descrição do produto e as condições/descrições legais.
 
 Produto: %s
 NCM: %s
 Descrição NCM: %s
-Isenções Candidatas: %s
+Diferimentos Candidatos: %s
 
 Responda APENAS JSON:
 {
-  "isento": true|false,
+  "diferido": true|false,
   "artigo": "...",
-  "paragrafo": "...",
   "justificativa": "Sua justificativa aqui em no máximo 20 palavras"
+  "observacao": "Somente no caso do artigo 391 de pescados retornar: Nas saídas de estabelecimento com CNAE principal 1020-1/01 ou 1020-1/02 — não é diferido"
 }
 
-O campo "isento" deve ser um booleano (true ou false) e não uma string.`, req.Descricao, req.NCM, ncmDescricao, string(isencoesJSON))
+O campo "diferido" deve ser um booleano.`, req.Descricao, req.NCM, ncmDescricao, string(diferimentosJSON))
 
 	reqBody := geminiRequest{
 		Contents: []geminiContent{
@@ -154,11 +151,7 @@ O campo "isento" deve ser um booleano (true ou false) e não uma string.`, req.D
 	rawText = strings.TrimSuffix(rawText, "```")
 	rawText = strings.TrimSpace(rawText)
 
-	if rawText == "" {
-		return nil, fmt.Errorf("Gemini retornou um texto vazio para a análise de isenção")
-	}
-
-	var llmResult domains.IsencaoValidacaoResponse
+	var llmResult domains.DiferimentoValidacaoResponse
 	if err := json.Unmarshal([]byte(rawText), &llmResult); err != nil {
 		return nil, fmt.Errorf("erro ao processar decisão da IA: %w (raw: %s)", err, rawText)
 	}

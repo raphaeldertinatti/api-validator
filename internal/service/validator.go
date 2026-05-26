@@ -7,11 +7,12 @@ import (
 )
 
 type ValidatorService struct {
-	ncm       *NCMService
-	ipi       *IPIService
-	cest      *CESTService
-	piscofins *PISCOFINSService
-	isencao   *IsencaoService
+	ncm         *NCMService
+	ipi         *IPIService
+	cest        *CESTService
+	piscofins   *PISCOFINSService
+	isencao     *IsencaoService
+	diferimento *DiferimentoService
 }
 
 func NewValidatorService(
@@ -20,6 +21,7 @@ func NewValidatorService(
 	cestRepo CESTRepository,
 	piscofinsRepo PISCOFINSRepository,
 	isencaoRepo IsencaoRepository,
+	diferimentoRepo DiferimentoRepository,
 	apiKey string,
 ) *ValidatorService {
 	// Inicializa o serviço base de IA
@@ -31,13 +33,15 @@ func NewValidatorService(
 	cest := NewCESTService(cestRepo, gemini)
 	piscofins := NewPISCOFINSService(piscofinsRepo)
 	isencao := NewIsencaoService(ncmRepo, isencaoRepo, gemini)
+	diferimento := NewDiferimentoService(ncmRepo, diferimentoRepo, gemini)
 
 	return &ValidatorService{
-		ncm:       ncm,
-		ipi:       ipi,
-		cest:      cest,
-		piscofins: piscofins,
-		isencao:   isencao,
+		ncm:         ncm,
+		ipi:         ipi,
+		cest:        cest,
+		piscofins:   piscofins,
+		isencao:     isencao,
+		diferimento: diferimento,
 	}
 }
 
@@ -78,22 +82,39 @@ func (v *ValidatorService) Validate(ctx context.Context, req domains.ValidateReq
 		return nil, err
 	}
 
-	// 6. Se for Isento retorna a response e não valida mais nada, isenção prevalece sobre os outros impostos.
+	// 6. Diferimento — depende do NCM
+	diferimentoResult, err := v.diferimento.ValidateDiferimento(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// 7. Se for Isento retorna a response e não valida mais nada, isenção prevalece sobre os outros impostos.
 	if isencaoResult.Isento {
 		return &domains.ValidateResponse{
-			NCM:       ncmResult,
-			IPI:       ipiResult,
-			CEST:      cestResult,
-			PISCOFINS: piscofinsResult,
-			Isencao:   isencaoResult,
+			NCM:         ncmResult,
+			IPI:         ipiResult,
+			CEST:        cestResult,
+			PISCOFINS:   piscofinsResult,
+			Isencao:     isencaoResult,
+			Diferimento: diferimentoResult,
+		}, nil
+	} else if diferimentoResult.Diferido { // 8. Se for Diferido retorna a response e não valida mais nada. Diferimento prevalece sobre os outros impostos (exceto isenção).
+		return &domains.ValidateResponse{
+			NCM:         ncmResult,
+			IPI:         ipiResult,
+			CEST:        cestResult,
+			PISCOFINS:   piscofinsResult,
+			Isencao:     isencaoResult,
+			Diferimento: diferimentoResult,
 		}, nil
 	}
 
 	return &domains.ValidateResponse{
-		NCM:       ncmResult,
-		IPI:       ipiResult,
-		CEST:      cestResult,
-		PISCOFINS: piscofinsResult,
-		Isencao:   isencaoResult,
+		NCM:         ncmResult,
+		IPI:         ipiResult,
+		CEST:        cestResult,
+		PISCOFINS:   piscofinsResult,
+		Isencao:     isencaoResult,
+		Diferimento: diferimentoResult,
 	}, nil
 }

@@ -70,8 +70,9 @@ O campo status deve ser exatamente "SIM" ou "NAO".`, prodDesc, ncmDesc)
 			{Parts: []geminiPart{{Text: prompt}}},
 		},
 		GenerationConfig: geminiGenerationConfig{
-			Temperature:     0.1,
-			MaxOutputTokens: 800,
+			Temperature:      0.1,
+			MaxOutputTokens:  2048,
+			ResponseMimeType: "application/json",
 		},
 	}
 
