@@ -65,8 +65,9 @@ DEFINIDO: 1 match claro. AMBIGUO: dúvida (liste em possibilidades). PADRAO: 0 m
 			{Parts: []geminiPart{{Text: prompt}}},
 		},
 		GenerationConfig: geminiGenerationConfig{
-			Temperature:     0.1,
-			MaxOutputTokens: 1024,
+			Temperature:      0.1,
+			MaxOutputTokens:  2048,
+			ResponseMimeType: "application/json",
 		},
 	}
 
