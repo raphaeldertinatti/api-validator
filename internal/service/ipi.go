@@ -16,14 +16,16 @@ type IPIRepository interface {
 }
 
 type IPIService struct {
-	repo   IPIRepository
-	gemini *GeminiService
+	ncmRepo NCMRepository
+	repo    IPIRepository
+	gemini  *GeminiService
 }
 
-func NewIPIService(repo IPIRepository, gemini *GeminiService) *IPIService {
+func NewIPIService(ncmRepo NCMRepository, repo IPIRepository, gemini *GeminiService) *IPIService {
 	return &IPIService{
-		repo:   repo,
-		gemini: gemini,
+		ncmRepo: ncmRepo,
+		repo:    repo,
+		gemini:  gemini,
 	}
 }
 
@@ -34,31 +36,58 @@ func (s *IPIService) ValidateIPI(ctx context.Context, req domains.ValidateReques
 		return nil, fmt.Errorf("erro ao buscar IPI: %w", err)
 	}
 	if doc == nil {
-		return &domains.IPIValidacaoResponse{Situacao: "NCM não encontrada"}, nil
+		return &domains.IPIValidacaoResponse{
+			Status:   "NCM_NAO_ENCONTRADA",
+			Situacao: "NCM não encontrada",
+		}, nil
 	}
 
 	// 2. Se tiver EX Tarifário, chama a lógica especializada
 	if doc.TemEx && len(doc.ExTarifarios) > 0 {
-		return s.EnquadramentoExIPI(ctx, req, doc)
+		ncmDescricao, err := s.ncmRepo.FindDescricaoCompleta(ctx, req.NCM)
+		if err != nil {
+			return nil, fmt.Errorf("erro ao buscar NCM: %w", err)
+		}
+		return s.EnquadramentoExIPI(ctx, req, doc, ncmDescricao)
 	}
 
 	return &domains.IPIValidacaoResponse{
+		Status:   "DEFINIDO",
 		Aliquota: doc.Aliquota,
 		Situacao: doc.Situacao,
 	}, nil
 }
 
-func (s *IPIService) EnquadramentoExIPI(ctx context.Context, req domains.ValidateRequest, doc *domains.IPIDocument) (*domains.IPIValidacaoResponse, error) {
+func (s *IPIService) EnquadramentoExIPI(ctx context.Context, req domains.ValidateRequest, doc *domains.IPIDocument, ncmDescricao string) (*domains.IPIValidacaoResponse, error) {
 	exsJSON, _ := json.Marshal(doc.ExTarifarios)
 
 	prompt := fmt.Sprintf(`Você é um especialista tributário. Classifique o Produto nos EX da NCM %s.
 Prod: %s
+Descrição NCM: %s
 EXs: %s
 
 Responda APENAS JSON:
-{"status":"DEFINIDO"|"AMBIGUO"|"PADRAO","ex_enquadrado":{"ex":"","aliquota":0,"descricao":"","justificativa":""},"possibilidades":[],"justificativa":"Sua justificativa aqui em no máximo 20 palavras"}
+{
+  "status": "DEFINIDO" | "AMBIGUO" | "PADRAO",
+  "ex_enquadrado": {
+    "ex": "01",
+    "aliquota": 0,
+    "descricao": "...",
+    "justificativa": "..."
+  },
+  "possibilidades": [
+    {
+      "ex": "02",
+      "aliquota": 0,
+      "descricao": "...",
+      "justificativa": "..."
+    }
+  ],
+  "justificativa": "Sua justificativa aqui em no máximo 20 palavras"
+}
 
-DEFINIDO: 1 match claro. AMBIGUO: dúvida (liste em possibilidades). PADRAO: 0 match.`, req.NCM, req.Descricao, string(exsJSON))
+DEFINIDO: 1 match claro. AMBIGUO: dúvida entre 2 ou mais EX (liste-os em possibilidades). PADRAO: nenhum match com os EX fornecidos.
+Se status for AMBIGUO, preencha "possibilidades" com os EX candidatos que causaram a dúvida.`, req.NCM, req.Descricao, ncmDescricao, string(exsJSON))
 
 	reqBody := geminiRequest{
 		Contents: []geminiContent{
@@ -111,14 +140,15 @@ DEFINIDO: 1 match claro. AMBIGUO: dúvida (liste em possibilidades). PADRAO: 0 m
 		return nil, fmt.Errorf("resposta vazia do Gemini")
 	}
 
-	rawText := strings.TrimSpace(gemResp.Candidates[0].Content.Parts[0].Text)
+	candidate := gemResp.Candidates[0]
+	rawText := strings.TrimSpace(candidate.Content.Parts[0].Text)
 	rawText = strings.TrimPrefix(rawText, "```json")
 	rawText = strings.TrimPrefix(rawText, "```")
 	rawText = strings.TrimSuffix(rawText, "```")
 	rawText = strings.TrimSpace(rawText)
 
 	if rawText == "" {
-		return nil, fmt.Errorf("Gemini retornou um texto vazio para enquadramento de IPI")
+		return nil, fmt.Errorf("Gemini retornou um texto vazio para enquadramento de IPI (finishReason: %s)", candidate.FinishReason)
 	}
 
 	var llmResult struct {
@@ -129,10 +159,11 @@ DEFINIDO: 1 match claro. AMBIGUO: dúvida (liste em possibilidades). PADRAO: 0 m
 	}
 
 	if err := json.Unmarshal([]byte(rawText), &llmResult); err != nil {
-		return nil, fmt.Errorf("erro ao processar decisão da IA: %w (raw: %s)", err, rawText)
+		return nil, fmt.Errorf("erro ao processar decisão da IA: %w (finishReason: %s, raw: %s)", err, candidate.FinishReason, rawText)
 	}
 
 	finalResp := &domains.IPIValidacaoResponse{
+		Status:        llmResult.Status,
 		Aliquota:      doc.Aliquota,
 		Situacao:      doc.Situacao,
 		Justificativa: llmResult.Justificativa,

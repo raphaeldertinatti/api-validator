@@ -7,4 +7,5 @@ type ValidateResponse struct {
 	PISCOFINS   *PISCOFINSValidacaoResponse   `json:"piscofins,omitempty"`
 	Isencao     *IsencaoValidacaoResponse     `json:"isencao,omitempty"`
 	Diferimento *DiferimentoValidacaoResponse `json:"diferimento,omitempty"`
+	Aliquota    *AliquotaValidacaoResponse    `json:"aliquota,omitempty"`
 }

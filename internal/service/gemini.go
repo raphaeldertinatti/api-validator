@@ -15,7 +15,7 @@ type GeminiService struct {
 func NewGeminiService(apiKey string) *GeminiService {
 	return &GeminiService{
 		apiKey: apiKey,
-		model:  "gemini-3-flash-preview", // melhor custo-benefício no plano gratuito
+		model:  "gemini-3-flash-preview", // modelo estável e rápido
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -44,7 +44,8 @@ type geminiGenerationConfig struct {
 
 type geminiResponse struct {
 	Candidates []struct {
-		Content geminiContent `json:"content"`
+		Content      geminiContent `json:"content"`
+		FinishReason string        `json:"finishReason"`
 	} `json:"candidates"`
 	Error *struct {
 		Message string `json:"message"`

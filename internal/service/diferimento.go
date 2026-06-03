@@ -145,15 +145,20 @@ O campo "diferido" deve ser um booleano.`, req.Descricao, req.NCM, ncmDescricao,
 		return nil, fmt.Errorf("resposta vazia do Gemini")
 	}
 
-	rawText := strings.TrimSpace(gemResp.Candidates[0].Content.Parts[0].Text)
+	candidate := gemResp.Candidates[0]
+	rawText := strings.TrimSpace(candidate.Content.Parts[0].Text)
 	rawText = strings.TrimPrefix(rawText, "```json")
 	rawText = strings.TrimPrefix(rawText, "```")
 	rawText = strings.TrimSuffix(rawText, "```")
 	rawText = strings.TrimSpace(rawText)
 
+	if rawText == "" {
+		return nil, fmt.Errorf("Gemini retornou um texto vazio para a análise de diferimento (finishReason: %s)", candidate.FinishReason)
+	}
+
 	var llmResult domains.DiferimentoValidacaoResponse
 	if err := json.Unmarshal([]byte(rawText), &llmResult); err != nil {
-		return nil, fmt.Errorf("erro ao processar decisão da IA: %w (raw: %s)", err, rawText)
+		return nil, fmt.Errorf("erro ao processar decisão da IA: %w (finishReason: %s, raw: %s)", err, candidate.FinishReason, rawText)
 	}
 
 	return &llmResult, nil

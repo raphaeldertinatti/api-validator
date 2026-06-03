@@ -13,6 +13,7 @@ type ValidatorService struct {
 	piscofins   *PISCOFINSService
 	isencao     *IsencaoService
 	diferimento *DiferimentoService
+	aliquota    *AliquotaService
 }
 
 func NewValidatorService(
@@ -22,6 +23,7 @@ func NewValidatorService(
 	piscofinsRepo PISCOFINSRepository,
 	isencaoRepo IsencaoRepository,
 	diferimentoRepo DiferimentoRepository,
+	aliquotaRepo AliquotaRepository,
 	apiKey string,
 ) *ValidatorService {
 	// Inicializa o serviço base de IA
@@ -29,11 +31,12 @@ func NewValidatorService(
 
 	// Inicializa os sub-serviços especializados
 	ncm := NewNCMService(ncmRepo, gemini)
-	ipi := NewIPIService(ipiRepo, gemini)
+	ipi := NewIPIService(ncmRepo, ipiRepo, gemini)
 	cest := NewCESTService(cestRepo, gemini)
 	piscofins := NewPISCOFINSService(piscofinsRepo)
 	isencao := NewIsencaoService(ncmRepo, isencaoRepo, gemini)
 	diferimento := NewDiferimentoService(ncmRepo, diferimentoRepo, gemini)
+	aliquota := NewAliquotaService(ncmRepo, aliquotaRepo, gemini)
 
 	return &ValidatorService{
 		ncm:         ncm,
@@ -42,6 +45,7 @@ func NewValidatorService(
 		piscofins:   piscofins,
 		isencao:     isencao,
 		diferimento: diferimento,
+		aliquota:    aliquota,
 	}
 }
 
@@ -109,6 +113,12 @@ func (v *ValidatorService) Validate(ctx context.Context, req domains.ValidateReq
 		}, nil
 	}
 
+	// 9. Aliquota — depende do NCM
+	aliquotaResult, err := v.aliquota.ValidateAliquota(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
 	return &domains.ValidateResponse{
 		NCM:         ncmResult,
 		IPI:         ipiResult,
@@ -116,5 +126,6 @@ func (v *ValidatorService) Validate(ctx context.Context, req domains.ValidateReq
 		PISCOFINS:   piscofinsResult,
 		Isencao:     isencaoResult,
 		Diferimento: diferimentoResult,
+		Aliquota:    aliquotaResult,
 	}, nil
 }

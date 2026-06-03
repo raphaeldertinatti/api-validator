@@ -74,11 +74,14 @@ Responda APENAS JSON:
 {
   "status": "DEFINIDO"|"AMBIGUO"|"NAO_ENQUADRADO",
   "enquadrado": {"cest":"", "descricao":"", "segmento":""},
-  "possibilidades": [],
+  "possibilidades": [
+    {"cest":"", "descricao":"", "segmento":""}
+  ],
   "justificativa": "Sua justificativa aqui em no máximo 15 palavras"
 }
 
-Se status não for DEFINIDO, deixe "enquadrado" como nulo ou vazio.
+Se status não for DEFINIDO, deixe "enquadrado" como nulo.
+Se status for AMBIGUO, preencha "possibilidades" com os CESTs candidatos que causaram a dúvida.
 DEFINIDO: Descrição do produto bate com 1 CEST.
 AMBIGUO: Descrição bate com >1 CEST.
 NAO_ENQUADRADO: Nenhuma descrição bate.`, req.Descricao, req.NCM, string(cestsJSON))
@@ -134,19 +137,20 @@ NAO_ENQUADRADO: Nenhuma descrição bate.`, req.Descricao, req.NCM, string(cests
 		return nil, fmt.Errorf("resposta vazia do Gemini")
 	}
 
-	rawText := strings.TrimSpace(gemResp.Candidates[0].Content.Parts[0].Text)
+	candidate := gemResp.Candidates[0]
+	rawText := strings.TrimSpace(candidate.Content.Parts[0].Text)
 	rawText = strings.TrimPrefix(rawText, "```json")
 	rawText = strings.TrimPrefix(rawText, "```")
 	rawText = strings.TrimSuffix(rawText, "```")
 	rawText = strings.TrimSpace(rawText)
 
 	if rawText == "" {
-		return nil, fmt.Errorf("Gemini retornou um texto vazio para a análise de CEST")
+		return nil, fmt.Errorf("Gemini retornou um texto vazio para a análise de CEST (finishReason: %s)", candidate.FinishReason)
 	}
 
 	var llmResult domains.CESTValidacaoResponse
 	if err := json.Unmarshal([]byte(rawText), &llmResult); err != nil {
-		return nil, fmt.Errorf("erro ao processar decisão da IA: %w (raw: %s)", err, rawText)
+		return nil, fmt.Errorf("erro ao processar decisão da IA: %w (finishReason: %s, raw: %s)", err, candidate.FinishReason, rawText)
 	}
 
 	return &llmResult, nil
