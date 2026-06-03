@@ -116,7 +116,8 @@ O campo status deve ser exatamente "SIM" ou "NAO".`, prodDesc, ncmDesc)
 		return nil, fmt.Errorf("resposta vazia do Gemini")
 	}
 
-	rawText := strings.TrimSpace(gemResp.Candidates[0].Content.Parts[0].Text)
+	candidate := gemResp.Candidates[0]
+	rawText := strings.TrimSpace(candidate.Content.Parts[0].Text)
 
 	// limpa markdown caso o modelo desobedeça o prompt
 	rawText = strings.TrimPrefix(rawText, "```json")
@@ -124,30 +125,16 @@ O campo status deve ser exatamente "SIM" ou "NAO".`, prodDesc, ncmDesc)
 	rawText = strings.TrimSuffix(rawText, "```")
 	rawText = strings.TrimSpace(rawText)
 
+	if rawText == "" {
+		return nil, fmt.Errorf("Gemini retornou um texto vazio para a análise de NCM (finishReason: %s)", candidate.FinishReason)
+	}
+
 	var llmResult struct {
 		Status        string `json:"status"`
 		Justificativa string `json:"justificativa"`
 	}
 	if err := json.Unmarshal([]byte(rawText), &llmResult); err != nil {
-		// fallback: tenta extrair informações básicas se o JSON vier malformado
-		status := "NAO"
-		if strings.Contains(strings.ToUpper(rawText), "SIM") {
-			status = "SIM"
-		}
-
-		// Limpa o texto para tentar remover resquícios de JSON se houver
-		justificativa := rawText
-		justificativa = strings.ReplaceAll(justificativa, "{", "")
-		justificativa = strings.ReplaceAll(justificativa, "}", "")
-		justificativa = strings.ReplaceAll(justificativa, "\"status\":", "")
-		justificativa = strings.ReplaceAll(justificativa, "\"justificativa\":", "")
-		justificativa = strings.TrimSpace(justificativa)
-
-		return &domains.NCMCompatibilidadeResult{
-			Compativel:    status == "SIM",
-			Status:        status,
-			Justificativa: justificativa,
-		}, nil
+		return nil, fmt.Errorf("erro ao processar decisão da IA: %w (finishReason: %s, raw: %s)", err, candidate.FinishReason, rawText)
 	}
 
 	status := strings.ToUpper(strings.TrimSpace(llmResult.Status))
