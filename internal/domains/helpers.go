@@ -45,9 +45,19 @@ func (d DiferimentoDocument) DocKey() string {
 
 // DocKey retorna a chave única de identificação para AliquotaDocument
 func (d AliquotaDocument) DocKey() string {
-	return fmt.Sprintf("%s_%s_%s_%s",
+	return fmt.Sprintf("%s_%v_%s_%s",
 		d.Artigo,
 		d.Aliquota,
+		d.Inciso,
+		d.Subtipo,
+	)
+}
+
+// DocKey retorna a chave única de identificação para ReducaoDocument
+func (d ReducaoDocument) DocKey() string {
+	return fmt.Sprintf("%s_%v_%s_%s",
+		d.Artigo,
+		d.CargaTributaria,
 		d.Inciso,
 		d.Subtipo,
 	)

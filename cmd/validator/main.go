@@ -35,9 +35,10 @@ func main() {
 	isencaoRepo := repository.NewIsencaoRepository(mongoDB)
 	diferimentoRepo := repository.NewDiferimentoRepository(mongoDB)
 	aliquotaRepo := repository.NewAliquotaRepository(mongoDB)
+	reducaoRepo := repository.NewReducaoRepository(mongoDB)
 
 	// 3. Inicializar Serviços (Lógica de Negócio)
-	validatorService := service.NewValidatorService(ncmRepo, ipiRepo, cestRepo, piscofinsRepo, isencaoRepo, diferimentoRepo, aliquotaRepo, cfg.GeminiAPIKey)
+	validatorService := service.NewValidatorService(ncmRepo, ipiRepo, cestRepo, piscofinsRepo, isencaoRepo, diferimentoRepo, aliquotaRepo, reducaoRepo, cfg.GeminiAPIKey)
 
 	// 4. Inicializar Handler (Rotas e Injeção de Dependência)
 	h := handler.NewHandler(validatorService)

@@ -14,6 +14,7 @@ type ValidatorService struct {
 	isencao     *IsencaoService
 	diferimento *DiferimentoService
 	aliquota    *AliquotaService
+	reducao     *ReducaoService
 }
 
 func NewValidatorService(
@@ -24,6 +25,7 @@ func NewValidatorService(
 	isencaoRepo IsencaoRepository,
 	diferimentoRepo DiferimentoRepository,
 	aliquotaRepo AliquotaRepository,
+	reducaoRepo ReducaoRepository,
 	apiKey string,
 ) *ValidatorService {
 	// Inicializa o serviço base de IA
@@ -37,6 +39,7 @@ func NewValidatorService(
 	isencao := NewIsencaoService(ncmRepo, isencaoRepo, gemini)
 	diferimento := NewDiferimentoService(ncmRepo, diferimentoRepo, gemini)
 	aliquota := NewAliquotaService(ncmRepo, aliquotaRepo, gemini)
+	reducao := NewReducaoService(ncmRepo, reducaoRepo, gemini) // Passa nil por enquanto, o MongoDB será injetado depois
 
 	return &ValidatorService{
 		ncm:         ncm,
@@ -46,6 +49,7 @@ func NewValidatorService(
 		isencao:     isencao,
 		diferimento: diferimento,
 		aliquota:    aliquota,
+		reducao:     reducao,
 	}
 }
 
@@ -119,6 +123,12 @@ func (v *ValidatorService) Validate(ctx context.Context, req domains.ValidateReq
 		return nil, err
 	}
 
+	// 10. Redução — depende do NCM e da Alíquota
+	reducaoResult, err := v.reducao.ValidateReducao(*aliquotaResult, ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
 	return &domains.ValidateResponse{
 		NCM:         ncmResult,
 		IPI:         ipiResult,
@@ -127,5 +137,6 @@ func (v *ValidatorService) Validate(ctx context.Context, req domains.ValidateReq
 		Isencao:     isencaoResult,
 		Diferimento: diferimentoResult,
 		Aliquota:    aliquotaResult,
+		Reducao:     reducaoResult,
 	}, nil
 }

@@ -8,4 +8,5 @@ type ValidateResponse struct {
 	Isencao     *IsencaoValidacaoResponse     `json:"isencao,omitempty"`
 	Diferimento *DiferimentoValidacaoResponse `json:"diferimento,omitempty"`
 	Aliquota    *AliquotaValidacaoResponse    `json:"aliquota,omitempty"`
+	Reducao     *ReducaoValidacaoResponse     `json:"reducao,omitempty"`
 }
