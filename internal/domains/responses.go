@@ -9,4 +9,5 @@ type ValidateResponse struct {
 	Diferimento *DiferimentoValidacaoResponse `json:"diferimento,omitempty"`
 	Aliquota    *AliquotaValidacaoResponse    `json:"aliquota,omitempty"`
 	Reducao     *ReducaoValidacaoResponse     `json:"reducao,omitempty"`
+	ICMSST      *IcmsStValidacaoResponse      `json:"icms_st,omitempty"`
 }

@@ -15,6 +15,7 @@ type ValidatorService struct {
 	diferimento *DiferimentoService
 	aliquota    *AliquotaService
 	reducao     *ReducaoService
+	icmsSt      *IcmsStService
 }
 
 func NewValidatorService(
@@ -26,6 +27,7 @@ func NewValidatorService(
 	diferimentoRepo DiferimentoRepository,
 	aliquotaRepo AliquotaRepository,
 	reducaoRepo ReducaoRepository,
+	icmsStRepo IcmsStRepository,
 	apiKey string,
 ) *ValidatorService {
 	// Inicializa o serviço base de IA
@@ -39,7 +41,8 @@ func NewValidatorService(
 	isencao := NewIsencaoService(ncmRepo, isencaoRepo, gemini)
 	diferimento := NewDiferimentoService(ncmRepo, diferimentoRepo, gemini)
 	aliquota := NewAliquotaService(ncmRepo, aliquotaRepo, gemini)
-	reducao := NewReducaoService(ncmRepo, reducaoRepo, gemini) // Passa nil por enquanto, o MongoDB será injetado depois
+	reducao := NewReducaoService(ncmRepo, reducaoRepo, gemini)
+	icmsSt := NewIcmsStService(icmsStRepo)
 
 	return &ValidatorService{
 		ncm:         ncm,
@@ -50,6 +53,7 @@ func NewValidatorService(
 		diferimento: diferimento,
 		aliquota:    aliquota,
 		reducao:     reducao,
+		icmsSt:      icmsSt,
 	}
 }
 
@@ -129,6 +133,12 @@ func (v *ValidatorService) Validate(ctx context.Context, req domains.ValidateReq
 		return nil, err
 	}
 
+	//11. ICMS ST - depende do NCM e do CEST
+	icmsStResult, err := v.icmsSt.ValidateIcmsSt(ctx, req, cestResult)
+	if err != nil {
+		return nil, err
+	}
+
 	return &domains.ValidateResponse{
 		NCM:         ncmResult,
 		IPI:         ipiResult,
@@ -138,5 +148,6 @@ func (v *ValidatorService) Validate(ctx context.Context, req domains.ValidateReq
 		Diferimento: diferimentoResult,
 		Aliquota:    aliquotaResult,
 		Reducao:     reducaoResult,
+		ICMSST:      icmsStResult,
 	}, nil
 }
