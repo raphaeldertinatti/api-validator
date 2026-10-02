@@ -1,100 +1,102 @@
-# API Validator - Validação Tributária Automática
+# API Validator - Automated Tax Validation
 
-Projeto pessoal para validação tributária completa de produtos do varejo alimentício. Como já trabalhei na área, sempre quis tentar automatizar este desafio cruzando dados fiscais com inteligência artificial para checar cadastros de produtos.
+A personal project that validates the full tax classification of retail food products in Brazil. I used to work in tax compliance, and I always wanted to automate this task by combining curated tax data with AI to check product registrations.
 
-> **Sobre a continuidade:** Eu não levei o projeto para frente por conta das constantes alterações na legislação, o que demandaria um tempo muito grande ou um outro serviço de monitoramento e atualização desses dados tributários.
+> **Project status:** I did not take the project further because Brazilian tax legislation changes constantly. Keeping the data current would require a large ongoing effort or a separate service to monitor and update the tax rules.
 
 ---
 
-## 🔍 Como Funciona o Validador
+## 🔍 How the Validator Works
 
-A API recebe a descrição do produto (ex: *"Biscoito Recheado Chocolate 130g"*) junto com a NCM e executa uma esteira de validações encadeadas:
+The API receives a product description (e.g. *"Biscoito Recheado Chocolate 130g"*) together with its NCM code and runs a chain of validations:
 
 ```
-[Entrada: Produto + NCM] 
+[Input: Product + NCM]
        │
        ▼
- 1. Validação NCM (IA) ──(Incompatível?)──► [Para a Validação]
-       │ (Compatível)
-       ├─► 2. Validação IPI (Consulta + IA para Enquadramento Ex)
-       ├─► 3. Validação CEST (Consulta + IA para Desambiguação)
-       ├─► 4. Validação PIS/COFINS (Consulta)
-       ├─► 5. Validação Isenção (Consulta + IA) ──(É Isento?)──► [Retorna Resposta]
-       └─► 6. Validação Diferimento (Consulta + IA) ──(É Diferido?)──► [Retorna Resposta]
+ 1. NCM validation (AI) ──(Incompatible?)──► [Stop validation]
+       │ (Compatible)
+       ├─► 2. IPI validation (Lookup + AI for Ex-tariff exceptions)
+       ├─► 3. CEST validation (Lookup + AI for disambiguation)
+       ├─► 4. PIS/COFINS validation (Lookup)
+       ├─► 5. Exemption validation (Lookup + AI) ──(Exempt?)──► [Return response]
+       └─► 6. Deferral validation (Lookup + AI) ──(Deferred?)──► [Return response]
              │
-             ├─► 7. Validação Alíquota ICMS (Consulta + IA)
-             ├─► 8. Validação Redução de BC (Consulta + IA)
-             └─► 9. Validação ICMS ST (Valida com base no CEST)
+             ├─► 7. ICMS rate validation (Lookup + AI)
+             ├─► 8. Tax base reduction validation (Lookup + AI)
+             └─► 9. ICMS ST validation (based on the validated CEST)
 ```
 
-### 📌 Mapeamento das Validações
+### 📌 Validation Steps
 
-1. **NCM (Nomenclatura Comum do Mercosul):** 
-   - *Onde entra a IA:* A IA (Google Gemini) analisa semanticamente se a descrição comercial do produto condiz com a descrição oficial da NCM no banco de dados.
-   - *Gatilho de parada:* Se a NCM for considerada **incompatível**, o processo é interrompido imediatamente para evitar cálculos tributários sobre um NCM errado.
+1. **NCM (Mercosur Common Nomenclature, the product classification code):**
+   - *Where AI comes in:* Google Gemini checks semantically whether the product's commercial description matches the official NCM description stored in the database.
+   - *Stop condition:* If the NCM is considered **incompatible**, the process stops immediately to avoid calculating taxes on a wrong NCM.
 
-2. **IPI (Imposto sobre Produtos Industrializados):**
-   - Verifica a alíquota da tabela de IPI por NCM.
-   - *Onde entra a IA:* Quando existem exceções tarifárias (Ex-IPI), a IA analisa o detalhamento do produto para verificar se ele se enquadra na exceção.
+2. **IPI (federal tax on manufactured products):**
+   - Looks up the IPI rate for the NCM.
+   - *Where AI comes in:* When tariff exceptions exist (Ex-IPI), the AI analyzes the product details to check whether it fits the exception.
 
-3. **CEST (Código Especificador da Substituição Tributária):**
-   - Relaciona o NCM com a tabela de CEST no banco.
-   - *Onde entra a IA:* Se houverem múltiplos CESTs possíveis para a mesma NCM, a IA analisa a descrição do item para selecionar o CEST exato.
+3. **CEST (tax substitution code):**
+   - Maps the NCM to the CEST table in the database.
+   - *Where AI comes in:* When several CEST codes are possible for the same NCM, the AI analyzes the product description to select the exact one.
 
-4. **PIS / COFINS:**
-   - Consulta a tributação (Alíquota zero, Tributado, Monofásico) e a fundamentação legal correspondente na base MongoDB.
+4. **PIS / COFINS (federal social contributions):**
+   - Looks up the tax treatment (zero rate, taxed, single-phase) and the corresponding legal basis in MongoDB.
 
-5. **Isenção de ICMS:**
-   - Consulta regras e convênios fiscais de isenção vinculados à NCM.
-   - *Onde entra a IA:* Avalia se o produto atende às condições e especificidades exigidas pelo texto legal.
-   - *Prevalência:* Se for confirmado que o produto é **Isento**, o fluxo é finalizado (a isenção prevalece sobre alíquotas, reduções e ICMS ST).
+5. **ICMS exemption (state VAT):**
+   - Looks up exemption rules and tax agreements linked to the NCM.
+   - *Where AI comes in:* Evaluates whether the product meets the conditions required by the legal text.
+   - *Precedence:* If the product is confirmed as **exempt**, the flow ends (exemption takes precedence over rates, reductions and ICMS ST).
 
-6. **Diferimento de ICMS:**
-   - Verifica regras de adiamento do imposto.
-   - *Onde entra a IA:* Analisa se a aplicação do diferimento é válida para a descrição e categoria do produto.
-   - *Prevalência:* Se for **Diferido**, o fluxo é finalizado.
+6. **ICMS deferral:**
+   - Checks rules that defer the tax payment.
+   - *Where AI comes in:* Analyzes whether the deferral applies to the product's description and category.
+   - *Precedence:* If the product is **deferred**, the flow ends.
 
-7. **Alíquota Interna de ICMS:**
-   - Consulta no banco de dados a alíquota padrão ou específica cadastrada para o NCM no estado.
-   - *Onde entra a IA:* Auxilia na identificação de alíquotas diferenciadas (ex: produtos de cesta básica ou alíquotas específicas).
+7. **Internal ICMS rate:**
+   - Looks up the standard or specific rate registered for the NCM in the state.
+   - *Where AI comes in:* Helps identify differentiated rates (e.g. staple food products or specific rates).
 
-8. **Redução da Base de Cálculo (ICMS):**
-   - Verifica se há benefício de redução de BC cadastrado para a combinação NCM + Alíquota.
-   - *Onde entra a IA:* Analisa se as características do produto atendem ao regulamento do benefício.
+8. **ICMS tax base reduction:**
+   - Checks whether a tax base reduction benefit exists for the NCM + rate combination.
+   - *Where AI comes in:* Analyzes whether the product's characteristics meet the benefit's regulation.
 
-9. **ICMS ST (Substituição Tributária):**
-   - Valida a incidência de Substituição Tributária cruzando o enquadramento do NCM e do CEST validado anteriormente.
+9. **ICMS ST (tax substitution):**
+   - Validates whether tax substitution applies by cross-checking the NCM classification with the CEST validated earlier.
 
----
-
-## 🛠️ Tecnologias
-
-- **Go (Golang)** - Linguagem principal e esteira de validação
-- **Gin Web Framework** - Roteamento HTTP e API REST
-- **MongoDB** - Armazenamento de tabelas e regras fiscais
-- **Google Gemini API** - Análise semântica e enquadramento de regras fiscais
+> Scope: São Paulo state, intrastate operations.
 
 ---
 
-## 🚀 Como rodar o projeto
+## 🛠️ Tech Stack
 
-1. Clone o repositório e acesse a pasta:
+- **Go (Golang)** - Main language and validation pipeline
+- **Gin Web Framework** - HTTP routing and REST API
+- **MongoDB** - Storage for tax tables and rules
+- **Google Gemini API** - Semantic analysis and tax rule classification
+
+---
+
+## 🚀 Running the Project
+
+1. Clone the repository and open the folder:
    ```bash
    git clone https://github.com/raphaeldertinatti/api-validator.git
    cd api-validator
    ```
 
-2. Crie um arquivo `.env` baseado no `.env.example`:
+2. Create a `.env` file based on `.env.example`:
    ```env
    MONGO_URI=mongodb://localhost:27017
    DB_NAME=validator_db
-   GEMINI_API_KEY=sua_chave_aqui
+   GEMINI_API_KEY=your_key_here
    PORT=8080
    ```
 
-3. Execute a API:
+3. Run the API:
    ```bash
    go run cmd/validator/main.go
    ```
 
-A API rodará por padrão em `http://localhost:8080`.
+The API runs on `http://localhost:8080` by default.
